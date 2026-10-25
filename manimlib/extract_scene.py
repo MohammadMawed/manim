@@ -174,8 +174,9 @@ def insert_embed_line_to_module(module: Module, run_config: Dict) -> None:
 
     # Execute the code, which presumably redefines the user's
     # scene to include this embed line, within the relevant module.
-    # Ensure module is registered in sys.modules before exec, so that
-    # decorators like @dataclass that need to look up the module work.
+    # ModuleLoader.get_module normally registers this module first.
+    # Retain temporary registration for direct callers with a different or
+    # missing sys.modules entry, then restore the prior state.
     module_name = module.__name__
     previous_module = sys.modules.get(module_name)
     sys.modules[module_name] = module
