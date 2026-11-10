@@ -51,3 +51,35 @@ def test_latex_error_message_is_read_as_utf8(latex_cache, monkeypatch):
 
     with pytest.raises(LatexError, match="l.7 caf\u00e9"):
         full_tex_to_svg(get_full_tex("caf\u00e9 \\foo"))
+
+
+@pytest.mark.parametrize("compiler, extension", [("latex", ".dvi"), ("xelatex", ".xdv")])
+def test_failed_compile_cannot_reuse_previous_output(latex_cache, monkeypatch, compiler, extension):
+    output = latex_cache / ("working" + extension)
+    output.write_bytes(b"stale output")
+    conversions = []
+
+    def fake_run(command, **kwargs):
+        if command[0] == "dvisvgm":
+            conversions.append(command)
+            return subprocess.CompletedProcess(command, 0, b"<svg>stale</svg>", b"")
+        (latex_cache / "working.log").write_text(
+            "\n! Undefined control sequence.\nl.1 \\fraq\n", encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(command, 1, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(LatexError, match="Undefined control sequence"):
+        full_tex_to_svg(get_full_tex(r"\fraq{a}{b}"), compiler)
+    assert conversions == []
+
+
+def test_nonzero_compile_with_fresh_output_is_supported(latex_cache, monkeypatch):
+    def fake_run(command, **kwargs):
+        if command[0] == "dvisvgm":
+            return subprocess.CompletedProcess(command, 0, b"<svg>fresh</svg>", b"")
+        (latex_cache / "working.dvi").write_bytes(b"fresh output")
+        return subprocess.CompletedProcess(command, 1, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert full_tex_to_svg(get_full_tex("x")) == "<svg>fresh</svg>"

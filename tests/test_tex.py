@@ -29,24 +29,22 @@ def test_environment_specs_with_punctuation_are_removed(tex, expected):
 
 
 @pytest.mark.parametrize(
-    "tex",
+    ("tex", "expected"),
     [
-        r"\begin{align} x \end{align}",
-        r"\begin{alignat}{2} a \end{alignat}",
-        r"\begin{bmatrix} a \end{bmatrix}",
-        r"\begin{itemize} i \end{itemize}",
-        r"\begin{array}{cc} m \end{array}",
-        r"\begin{cases} c \end{cases}",
-        r"x + y",
-        r"\sqrt[3]{x}",
-        r"\frac{a}{b}",
+        (r"\begin{align} x \end{align}", "x"),
+        (r"\begin{alignat}{2} a \end{alignat}", "a"),
+        (r"\begin{bmatrix} a \end{bmatrix}", "a"),
+        (r"\begin{itemize} i \end{itemize}", "i"),
+        (r"\begin{array}{cc} m \end{array}", "m"),
+        (r"\begin{cases} c \end{cases}", "c"),
+        (r"x + y", "x + y"),
+        (r"\sqrt[3]{x}", r"\sqrt[3]{x}"),
+        (r"\frac{a}{b}", r"\frac{a}{b}"),
     ],
 )
-def test_already_handled_forms_are_unchanged(tex):
+def test_already_handled_forms_are_unchanged(tex, expected):
     # These all worked before; pinned so the widened groups cannot over-match.
-    assert remove_tex_environments(tex) == remove_tex_environments(tex)
-    assert "\begin" not in remove_tex_environments(tex)
-    assert "\end" not in remove_tex_environments(tex)
+    assert remove_tex_environments(tex).strip() == expected
 
 
 def test_symbol_count_ignores_the_environment_name():
