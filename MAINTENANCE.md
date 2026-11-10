@@ -101,4 +101,3 @@ python -m venv .venv
 ```
 
 Rendering additionally needs an accessible GPU and FFmpeg. See `tests/render_compare.py` for baseline capture and comparison. Keep reference images tied to the baseline commit and runtime; cross-platform rasterization need not be byte-identical.
-
