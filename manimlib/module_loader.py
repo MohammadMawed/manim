@@ -53,14 +53,25 @@ class ModuleLoader:
 
         # Add module to sys.modules before exec_module to ensure decorators
         # and relative imports work correctly
+        missing = object()
+        previous_module = sys.modules.get(module_name, missing)
         sys.modules[module_name] = module
 
-        if is_during_reload:
-            imported_modules = ModuleLoader._exec_module_and_track_imports(spec, module)
-            reloaded_modules_tracker = set()
-            ModuleLoader._reload_modules(imported_modules, reloaded_modules_tracker)
+        try:
+            if is_during_reload:
+                imported_modules = ModuleLoader._exec_module_and_track_imports(spec, module)
+                reloaded_modules_tracker = set()
+                ModuleLoader._reload_modules(imported_modules, reloaded_modules_tracker)
 
-        spec.loader.exec_module(module)
+            spec.loader.exec_module(module)
+        except BaseException:
+            # Match normal imports: a failed execution must not leave a
+            # partially initialized module in place of the last working one.
+            if previous_module is missing:
+                sys.modules.pop(module_name, None)
+            else:
+                sys.modules[module_name] = previous_module
+            raise
         return module
 
     @staticmethod
