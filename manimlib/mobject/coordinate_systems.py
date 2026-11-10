@@ -264,6 +264,7 @@ class CoordinateSystem(ABC):
         conditions
         """
         x_values = np.array([self.x_axis.p2n(p) for p in graph.get_points()])
+        x_min, x_max = x_values.min(), x_values.max()
 
         def get_graph_points():
             xs = x_values
@@ -271,7 +272,9 @@ class CoordinateSystem(ABC):
                 ds = get_discontinuities()
                 ep = 1e-6
                 added_xs = it.chain(*((d - ep, d + ep) for d in ds))
-                xs[:] = sorted([*x_values, *added_xs])[:len(x_values)]
+                # Clipping keeps the point count fixed as discontinuities move in and
+                # out of range, which Transform animations of the graph rely on
+                xs = np.clip(sorted([*x_values, *added_xs]), x_min, x_max)
             return self.c2p(xs, func(xs))
 
         graph.add_updater(
@@ -378,11 +381,17 @@ class CoordinateSystem(ABC):
             x_range = self.x_range[:2]
         if dx is None:
             dx = self.x_range[2]
+        # Copy before writing to the upper bound below, so a caller's own
+        # sequence is not modified.
+        x_range = list(x_range)
         if len(x_range) < 3:
-            x_range = [*x_range, dx]
+            x_range.append(dx)
 
         rects = []
-        x_range[1] = x_range[1] + dx
+        # np.arange steps by x_range[2], so reaching the requested right
+        # endpoint takes exactly one of those steps, not dx -- the two differ
+        # whenever the caller passes a step of its own.
+        x_range[1] = x_range[1] + x_range[2]
         xs = np.arange(*x_range)
         for x0, x1 in zip(xs, xs[1:]):
             if input_sample_type == "left":
@@ -714,8 +723,8 @@ class NumberPlane(Axes):
     def get_x_unit_size(self) -> float:
         return self.get_x_axis().get_unit_size()
 
-    def get_y_unit_size(self) -> list:
-        return self.get_x_axis().get_unit_size()
+    def get_y_unit_size(self) -> float:
+        return self.get_y_axis().get_unit_size()
 
     def get_axes(self) -> VGroup:
         return self.axes

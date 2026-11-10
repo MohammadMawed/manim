@@ -37,16 +37,41 @@ class ModuleLoader:
         if file_name is None:
             return None
 
-        module_name = file_name.replace(os.sep, ".").replace(".py", "")
+        module_path = os.path.abspath(file_name)
+        try:
+            rel_file_name = os.path.relpath(module_path, os.getcwd())
+            if rel_file_name == os.pardir or rel_file_name.startswith(
+                os.pardir + os.sep
+            ):
+                rel_file_name = os.path.basename(file_name)
+        except ValueError:
+            rel_file_name = os.path.basename(file_name)
+
+        module_name = os.path.splitext(rel_file_name)[0].replace(os.sep, ".")
         spec = importlib.util.spec_from_file_location(module_name, file_name)
         module = importlib.util.module_from_spec(spec)
 
-        if is_during_reload:
-            imported_modules = ModuleLoader._exec_module_and_track_imports(spec, module)
-            reloaded_modules_tracker = set()
-            ModuleLoader._reload_modules(imported_modules, reloaded_modules_tracker)
+        # Add module to sys.modules before exec_module to ensure decorators
+        # and relative imports work correctly
+        missing = object()
+        previous_module = sys.modules.get(module_name, missing)
+        sys.modules[module_name] = module
 
-        spec.loader.exec_module(module)
+        try:
+            if is_during_reload:
+                imported_modules = ModuleLoader._exec_module_and_track_imports(spec, module)
+                reloaded_modules_tracker = set()
+                ModuleLoader._reload_modules(imported_modules, reloaded_modules_tracker)
+
+            spec.loader.exec_module(module)
+        except BaseException:
+            # Match normal imports: a failed execution must not leave a
+            # partially initialized module in place of the last working one.
+            if previous_module is missing:
+                sys.modules.pop(module_name, None)
+            else:
+                sys.modules[module_name] = previous_module
+            raise
         return module
 
     @staticmethod
