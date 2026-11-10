@@ -5,6 +5,7 @@ from diskcache import Cache, Disk
 from diskcache.core import MODE_RAW, MODE_TEXT
 from contextlib import contextmanager
 from functools import wraps
+from pathlib import Path
 
 from manimlib.utils.directories import get_cache_dir
 from manimlib.utils.simple_functions import hash_string
@@ -35,6 +36,8 @@ class SvgDisk(Disk):
         # the caller has any opportunity to inspect the resulting value.
         if mode not in (MODE_RAW, MODE_TEXT):
             raise InvalidCacheEntry("SVG cache values must be plain text")
+        if mode == MODE_TEXT:
+            self.check_filename(filename)
         result = super().fetch(mode, filename, value, read)
         if type(result) is not str:
             raise InvalidCacheEntry("SVG cache values must be strings")
@@ -44,6 +47,24 @@ class SvgDisk(Disk):
         if read or type(value) is not str:
             raise TypeError("Only SVG strings can be stored in the render cache")
         return super().store(value, read, key=key)
+
+    def check_filename(self, filename):
+        if not isinstance(filename, str):
+            raise InvalidCacheEntry("Invalid SVG cache filename")
+        directory = Path(self._directory).resolve()
+        try:
+            (directory / filename).resolve().relative_to(directory)
+        except ValueError as error:
+            raise InvalidCacheEntry("SVG cache files must stay in the cache directory") from error
+
+    def remove(self, filename):
+        # Replacing a rejected entry also cleans up its recorded filename.
+        # A tampered database must not make that cleanup unlink an outside file.
+        try:
+            self.check_filename(filename)
+        except InvalidCacheEntry:
+            return
+        super().remove(filename)
 
 
 _cache = Cache(get_cache_dir(), size_limit=CACHE_SIZE, disk=SvgDisk)

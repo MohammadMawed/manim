@@ -3,6 +3,14 @@ name: Regression tests
 on:
   push:
     branches: [master, 'fix/**']
+    paths:
+      - 'manimlib/**'
+      - 'tests/**'
+      - 'setup.cfg'
+      - 'setup.py'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - '.github/workflows/tests.yml'
   pull_request:
   workflow_dispatch:
 
@@ -10,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
